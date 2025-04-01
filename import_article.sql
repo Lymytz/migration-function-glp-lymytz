@@ -10,6 +10,10 @@ DECLARE
     classes_ RECORD;
     conditionnements_ RECORD;
     unites_ RECORD;
+    codes_ RECORD;
+    categories_ RECORD;
+    articledepots_ RECORD;
+    taxes_ RECORD;
 
     article_ BIGINT;
     famille_ BIGINT;
@@ -17,6 +21,15 @@ DECLARE
     classe2_ BIGINT;
     conditionnement_ BIGINT;
     unite_ BIGINT;
+    code_ BIGINT;
+    categorie_ BIGINT;
+    articledepot_ BIGINT;
+    taxe_ BIGINT;
+
+    _depot_ BIGINT;
+    _categorie_ BIGINT;
+    _compte_ BIGINT;
+    _taxe_ BIGINT;
 
     query_ CHARACTER VARYING;
 
@@ -47,7 +60,7 @@ BEGIN
 	END LOOP;
 	-- END UNITE MESURE
 
-	-- BEGIN ARTICLE
+	-- BEGIN FAMILLE & ARTICLE
     query_ = 'SELECT reffamille, categoriefam, designation, remise, sommeil FROM famillearticles ';
 	FOR familles_  IN SELECT * FROM dblink('host='||serveur||' dbname='||database||' user='||users||' password='||password, query_)
 		AS t(reffamille character varying, categoriefam character varying, designation character varying, remise double precision, sommeil boolean)
@@ -57,6 +70,7 @@ BEGIN
 			INSERT INTO yvs_base_famille_article(reference_famille, designation, societe, author, actif) VALUES (familles_.reffamille, familles_.designation, societe_, 16, true);
 			famille_ = currval('yvs_prod_famille_article_id_seq');
 		END IF;
+		-- BEGIN ARTICLE
     	query_ = 'SELECT refart, categorie, changeprix, classe, codebarre, commentaire, conditionnement, designation, modeconso, norme, photos, poidnet, pua, puv, remise, sommeil, 
 					suivienstock, typepv, unite, unitepoids, reffamille, defnorme, visibleensynthese, datesave, taill_du_lot, new_ref, code_acces, code_sortie, 
 					classe2, appliquer_remise, groupe FROM articles WHERE reffamille = '||QUOTE_LITERAL(familles_.reffamille);
@@ -84,21 +98,92 @@ BEGIN
 					    true, null, null, current_date, COALESCE(articles_.datesave, current_date), classe_, classe2_, 'C');
 				article_ = currval('yvs_articles_id_seq');
 			END IF;
-			query_ = 'SELECT c.id, c.conditionnement, c.by_achat, c.by_prod, c.by_vente, c.pua, c.puv, c.remise, c.article, c.unite, u.reference FROM conditionnement c INNER JOIN yvs_unite_mesure u ON c.unite = u.id WHERE article = '||QUOTE_LITERAL(articles_.refart);
-			FOR conditionnements_  IN SELECT * FROM dblink('host='||serveur||' dbname='||database||' user='||users||' password='||password, query_)
-				AS t(id bigint, conditionnement character varying, by_achat boolean, by_prod boolean, by_vente boolean, pua double precision, puv double precision, remise double precision, article character varying, unite integer, reference character varying)
-			LOOP
-				SELECT INTO unite_ id FROM yvs_base_unite_mesure y WHERE y.reference = conditionnements_.reference AND y.societe = societe_;
+
+			-- BEGIN CONDITIONNEMENT
+				SELECT INTO unite_ id FROM yvs_base_unite_mesure y WHERE y.reference = articles_.conditionnement AND y.societe = societe_;
 				SELECT INTO conditionnement_ y.id FROM yvs_base_conditionnement y WHERE y.article = article_ AND y.unite = unite_;
 				IF(COALESCE(conditionnement_, 0) = 0)THEN
 					INSERT INTO yvs_base_conditionnement(article, unite, author, prix, prix_min, nature_prix_min, remise, cond_vente, prix_achat, photo, code_barre)
 						VALUES (article_, unite_, 16, conditionnements_.puv, conditionnements_.puv, 'MONTANT', conditionnements_.remise, conditionnements_.by_vente, conditionnements_.pua, null, null);
 					conditionnement_ = currval('yvs_base_conditionnement_id_seq');
 				END IF;
+
+				-- BEGIN CODE BARRE
+				SELECT INTO code_ y.id FROM yvs_base_article_code_barre y WHERE y.code_barre = articles_.codebarre AND y.conditionnement = conditionnement_;
+				IF(COALESCE(code_, 0) = 0)THEN
+					INSERT INTO yvs_base_article_code_barre (code_barre, conditionnement) VALUES  (articles_.codebarre, conditionnement_);
+					code_ = currval('yvs_base_article_code_barre_id_seq');
+				END IF;
+				-- END CODE BARRE
+			-- END CONDITIONNEMENT
+
+			-- BEGIN CATEGORIE COMPTABLE
+			query_ = 'SELECT refart, numcompte, categorie  FROM art_catc_compte WHERE refart = '||QUOTE_LITERAL(articles_.refart);
+			FOR categories_  IN SELECT * FROM dblink('host='||serveur||' dbname='||database||' user='||users||' password='||password, query_)
+				AS t(refart character varying, numcompte character varying, categorie character varying)
+			LOOP
+				SELECT INTO _categorie_ y.id FROM yvs_base_categorie_comptable y WHERE y.code = categories_.categorie AND y.societe = societe_;
+				SELECT INTO _compte_ y.id FROM yvs_base_plan_comptable y INNER JOIN yvs_base_nature_compte n ON y.nature_compte = n.id WHERE y.num_compte = categories_.numcompte AND n.societe = societe_;
+				IF((COALESCE(_categorie_, 0) != 0) AND (COALESCE(_compte_, 0) != 0))THEN
+					SELECT INTO categorie_ y.id FROM yvs_base_article_categorie_comptable y WHERE y.article = article_ AND y.categorie = _categorie_ AND y.compte = _compte_;
+					IF(COALESCE(categorie_, 0) = 0)THEN
+						INSERT INTO yvs_base_article_categorie_comptable
+						(article, categorie, compte, actif)
+						VALUES 
+						(article_, _categorie_, _compte_, true);
+						categorie_ = currval('yvs_base_compte_article_id_seq');
+					END IF;
+				END IF;
 			END LOOP;
+			-- END CATEGORIE COMPTABLE
+
+			-- BEGIN TAXES
+			query_ = 'SELECT categorie, codetaxe, refart FROM art_catc_taxes WHERE refart = '||QUOTE_LITERAL(articles_.refart);
+			FOR taxes_  IN SELECT * FROM dblink('host='||serveur||' dbname='||database||' user='||users||' password='||password, query_)
+				AS t(categorie character varying, codetaxe character varying, refart character varying)
+			LOOP
+				SELECT INTO _categorie_ y.id FROM yvs_base_article_categorie_comptable y INNER JOIN yvs_base_categorie_comptable c ON c.id = y.categorie WHERE c.code = taxes_.categorie AND y.article = article_;
+				SELECT INTO _taxe_ y.id FROM yvs_base_taxes y WHERE y.code_taxe = taxes_.codetaxe AND y.societe = societe_;
+				IF((COALESCE(_categorie_, 0) != 0) AND (COALESCE(_taxe_, 0) != 0))THEN
+					SELECT INTO taxe_ y.id FROM yvs_base_article_categorie_comptable_taxe y WHERE y.taxe = _taxe_ AND y.article_categorie = _categorie_;
+					IF(COALESCE(taxe_, 0) = 0)THEN
+						INSERT INTO yvs_base_article_categorie_comptable_taxe
+						(taxe, article_categorie, actif)
+						VALUES 
+						(_taxe_, _categorie_, true);
+						taxe_ = currval('yvs_base_taxe_article_id_seq');
+					END IF;
+				END IF;
+			END LOOP;
+			-- END TAXES
+
+			-- BEGIN ARTICLE DEPOT
+			query_ = 'SELECT codedepot, refart, stockmax, stockmin, pua, puv, remise, marge_minimale, conditionnement, quantite_vendu, prix_revient, 
+						controle_stock FROM articledepots WHERE refart = '||QUOTE_LITERAL(articles_.refart);
+			FOR articledepots_  IN SELECT * FROM dblink('host='||serveur||' dbname='||database||' user='||users||' password='||password, query_)
+				AS t(codedepot character varying, refart character varying, stockmax double precision, stockmin double precision, pua double precision, 
+					puv double precision, remise double precision, marge_minimale double precision, 
+					conditionnement integer, quantite_vendu double precision, prix_revient double precision, controle_stock boolean)
+			LOOP
+				SELECT INTO _depot_ y.id FROM yvs_base_depots y WHERE y.code = articledepots_.codedepot AND y.agence = agence_;
+				IF((COALESCE(_depot_, 0) != 0))THEN
+					SELECT INTO articledepot_ y.id FROM yvs_base_article_depot y WHERE y.depot = _depot_ AND y.article = article_;
+					IF(COALESCE(articledepot_, 0) = 0)THEN
+						INSERT INTO yvs_base_article_depot
+						(article, depot, stock_max, stock_min, mode_appro, mode_reappro, interval_approv, quantite_stock, actif, stock_alert, 
+							stock_initial, marg_stock_moyen, stock_net, suivi_stock, default_cond, depot_pr, default_pr, categorie)
+						VALUES 
+						(article_, _depot_, articledepots_.stockmax, articledepots_.stockmin, null, null, 0, 0, true, 0,
+						0, 0, 0, articles_.suivienstock, conditionnement_, _depot_, true, articles_.categorie);
+						articledepot_ = currval('yvs_base_article_depot_id_seq');
+					END IF;
+				END IF;
+			END LOOP;
+			-- END ARTICLE DEPOT
 		END LOOP;
+		-- END ARTICLE
 	END LOOP;
-	-- END ARTICLE
+	-- END FAMILLE & ARTICLE
 	return true;
 END;
 $function$

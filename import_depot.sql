@@ -1,11 +1,11 @@
-CREATE OR REPLACE FUNCTION public.migration_from_glp_depot(
+CREATE OR REPLACE FUNCTION migration_from_glp_depot(
     societe_ bigint,
     agence_ bigint,
     host character varying,
-    port integer,
     database character varying,
     users character varying,
     password character varying,
+    author bigint,
     simulate boolean DEFAULT true
 )
     RETURNS boolean
@@ -57,8 +57,8 @@ BEGIN
             ELSE
                 SELECT INTO depot_ y.id FROM yvs_base_depots y WHERE y.code = depots_.codedepot;
                 IF COALESCE(depot_, 0) = 0 THEN
-                    INSERT INTO yvs_base_depots (abbreviation, code, designation, agence, actif, date_save, date_update)
-                    VALUES (depots_.codedepot, depots_.codedepot, depots_.codedepot, agence_, depots_.actif, current_timestamp, current_timestamp)
+                    INSERT INTO yvs_base_depots (abbreviation, code, designation, agence, actif, date_save, date_update, author)
+                    VALUES (depots_.codedepot, depots_.codedepot, depots_.codedepot, agence_, depots_.actif, current_timestamp, current_timestamp,author)
                     RETURNING id INTO depot_;
                 END IF;
             END IF;

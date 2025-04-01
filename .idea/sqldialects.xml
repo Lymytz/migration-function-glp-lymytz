@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/import_article_articles.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_article_categories_comptables.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_article_classes_stat.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_article_code_barres.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_article_conditionnements.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_article_depots.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_article_famille.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_article_unite_mesure.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_caisse_journaux.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_compte.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_depot.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_depot_test.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_nomenclature.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_points_de_vente.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_ristourne.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_tiers.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/import_user.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/runner_query.sql" dialect="PostgreSQL" />
+  </component>
+</project>
